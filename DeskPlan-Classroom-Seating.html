@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>DeskPlan — Classroom Seating Planner</title>
+  <style>
+    :root {
+      --ink: #173b38;
+      --muted: #6d7b75;
+      --green: #1d6a60;
+      --green-dark: #164f48;
+      --green-soft: #e7f0ec;
+      --amber: #dc9840;
+      --paper: #fffdf8;
+      --canvas: #f5f2e9;
+      --line: #d7d6cc;
+      --desk-edge: #c3bda9;
+      --danger: #a8443b;
+      --radius: 12px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--canvas);
+    }
+
+    button,
+    input,
+    textarea { font: inherit; }
+
+    button { color: inherit; }
+
+    .app-header {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px clamp(18px, 4vw, 62px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 253, 248, .95);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--green);
+      border-radius: 13px;
+      box-shadow: 0 6px 16px rgba(29, 106, 96, .2);
+      transform: rotate(-3deg);
+      font-size: 21px;
+    }
+
+    .eyebrow {
+      margin: 0 0 1px;
+      color: #75817a;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1;
+      letter-spacing: -.03em;
+    }
+
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .button {
+      height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 13px;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    }
+
+    .button:hover { background: #f7f5ed; border-color: #bdc4bd; }
+    .button:active { transform: translateY(1px); }
+    .button:focus-visible { outline: 3px solid rgba(60, 139, 126, .25); outline-offset: 2px; }
+
+    .button-primary {
+      color: #fff;
+      background: var(--green);
+      border-color: var(--green);
+      box-shadow: 0 5px 14px rgba(29, 106, 96, .18);
+    }
+
+    .button-primary:hover { background: var(--green-dark); border-color: var(--green-dark); }
+
+    .button-save.is-saved {
+      color: #fff;
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    .save-state {
+      min-width: 105px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .save-state.unsaved { color: #a66c16; }
+    .save-state.saved { color: var(--green); }
+
+    .control-bar {
+      display: flex;
+      align-items: end;
+      flex-wrap: wrap;
+      gap: 16px clamp(20px, 3vw, 42px);
+      padding: 18px clamp(18px, 4vw, 62px);
+      background: #faf8f1;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .field,
+    .stepper-group { display: grid; gap: 6px; }
+
+    .field > span,
+    .stepper-group > span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .075em;
+      text-transform: uppercase;
+    }
+
+    .field { width: min(280px, 100%); }
+
+    input,
+    textarea {
+      width: 100%;
+      min-width: 0;
+      padding: 7px 10px;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid #cfcec3;
+      border-radius: 9px;
+      outline: none;
+    }
+
+    input { height: 38px; }
+    input:hover,
+    textarea:hover { border-color: #aeb9b2; }
+    input:focus,
+    textarea:focus { border-color: #3c8b7e; box-shadow: 0 0 0 3px rgba(60, 139, 126, .17); }
+
+    .class-input { font-size: 14px; font-weight: 700; }
+
+    .stepper {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      padding: 3px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .stepper button {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 7px;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .stepper button:hover { background: var(--green-soft); }
+    .stepper button:disabled { opacity: .3; cursor: not-allowed; }
+
+    .stepper strong {
+      min-width: 34px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .summary {
+      min-height: 38px;
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .summary-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--amber);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(220, 152, 64, .13);
+    }
+
+    .workspace {
+      width: min(1420px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 28px 0 34px;
+    }
+
+    .print-title { display: none; }
+
+    .room {
+      position: relative;
+      overflow: hidden;
+      padding: 24px clamp(16px, 3vw, 42px) 30px;
+      background: radial-gradient(circle at 17% 9%, rgba(242, 184, 75, .09), transparent 23%), var(--paper);
+      border: 1px solid #d5d2c5;
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(57, 70, 62, .08);
+    }
+
+    .room::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: .32;
+      background-image: linear-gradient(rgba(74, 98, 90, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(74, 98, 90, .035) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .perspective-note {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 22px;
+      color: #77847e;
+      font-size: 12px;
+    }
+
+    .perspective-note .dot {
+      width: 7px;
+      height: 7px;
+      background: var(--amber);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(220, 152, 64, .13);
+    }
+
+    .divider { width: 1px; height: 13px; margin: 0 5px; background: #d7d3c8; }
+
+    .columns-scroller {
+      position: relative;
+      z-index: 1;
+      overflow-x: auto;
+      padding: 3px 3px 20px;
+    }
+
+    .columns {
+      min-width: max-content;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(112px, 150px);
+      justify-content: center;
+      gap: clamp(10px, 1.6vw, 24px);
+    }
+
+    .seat-column {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+    }
+
+    .column-label {
+      margin: 0 0 1px;
+      color: #7c8982;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .seat {
+      min-width: 0;
+      padding: 9px 10px 10px;
+      background: rgba(255, 255, 255, .92);
+      border: 1px solid #d3d5ca;
+      border-bottom: 4px solid var(--desk-edge);
+      border-radius: 11px 11px 14px 14px;
+      box-shadow: 0 6px 12px rgba(66, 79, 70, .055);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease, opacity .15s ease;
+    }
+
+    .seat:hover { border-color: #9cb8af; box-shadow: 0 8px 18px rgba(36, 83, 74, .1); transform: translateY(-1px); }
+    .seat.selected { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(220, 152, 64, .2); }
+    .seat.dragging { opacity: .48; transform: scale(.98); }
+    .seat.drop-target { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29, 106, 96, .18); }
+
+    .seat-top {
+      min-height: 19px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1px;
+    }
+
+    .seat-position {
+      color: #98a19b;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+
+    .drag-handle {
+      width: 26px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      margin: -5px -6px -2px 0;
+      padding: 0;
+      color: #84918a;
+      background: transparent;
+      border: 0;
+      border-radius: 7px;
+      cursor: grab;
+      touch-action: none;
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .drag-handle:hover,
+    .drag-handle:focus-visible { color: var(--green); background: var(--green-soft); outline: none; }
+    .drag-handle:active { cursor: grabbing; }
+
+    .student-name {
+      height: 47px;
+      padding: 3px 4px;
+      background: transparent;
+      border-color: transparent;
+      border-radius: 5px;
+      box-shadow: none;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.22;
+      overflow: hidden;
+      resize: none;
+      text-align: center;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .student-name:hover,
+    .student-name:focus { background: #f3f5f0; }
+
+    .student-name-print { display: none; }
+
+    .class-no-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      color: #829089;
+      font-size: 10px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .class-no {
+      width: 48px;
+      height: 28px;
+      padding: 0 3px;
+      color: #68766f;
+      background: #f4f4ef;
+      border-color: transparent;
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .blackboard {
+      position: relative;
+      z-index: 1;
+      width: min(640px, 72%);
+      min-height: 67px;
+      margin: 14px auto 0;
+      display: grid;
+      place-items: center;
+      color: #f5f1df;
+      background: radial-gradient(circle at 22% 32%, rgba(255,255,255,.035), transparent 18%), #245148;
+      border: 7px solid #98795a;
+      border-bottom-width: 10px;
+      border-radius: 4px;
+      box-shadow: inset 0 0 24px rgba(5, 24, 20, .35), 0 7px 13px rgba(45, 55, 47, .12);
+      text-align: center;
+    }
+
+    .blackboard strong { display: block; font-size: 12px; letter-spacing: .2em; }
+    .blackboard span { color: #cbd9d2; font-family: ui-monospace, monospace; font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
+
+    .tip {
+      margin: 11px 0 0;
+      color: #78857f;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 100;
+      max-width: calc(100% - 32px);
+      padding: 10px 15px;
+      color: #fff;
+      background: #173b38;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(20, 45, 40, .22);
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 12px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 760px) {
+      .app-header { padding-inline: 14px; }
+      .brand-mark { width: 38px; height: 38px; }
+      .save-state { display: none; }
+      .control-bar { padding-inline: 14px; }
+      .field { width: 100%; }
+      .summary { width: 100%; margin-left: 0; }
+      .workspace { width: calc(100% - 22px); padding-top: 12px; }
+      .room { padding-inline: 11px; border-radius: 16px; }
+      .columns { justify-content: start; }
+    }
+
+    @media (max-width: 510px) {
+      .brand-copy { display: none; }
+      .header-actions { width: calc(100% - 52px); justify-content: flex-end; }
+      .button { padding-inline: 10px; }
+      .button .optional { display: none; }
+    }
+
+    @page { size: A4 landscape; margin: 7mm; }
+
+    @media print {
+      html, body { width: 100%; min-height: 0; color: #163a36; background: #fff; }
+      .no-print { display: none !important; }
+      .workspace { width: 100%; margin: 0; padding: 0; }
+      .print-title { display: flex; align-items: end; justify-content: space-between; margin-bottom: 2mm; padding-bottom: 1.5mm; border-bottom: 1px solid #c9cdc8; }
+      .print-title p, .print-title h2 { margin: 0; }
+      .print-title p { color: #697771; font-size: 8pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .print-title h2 { font-size: 17pt; letter-spacing: -.03em; }
+      .room { overflow: visible; padding: 2.5mm 3.5mm; background: #fff; border: 1px solid #bfc7c1; border-radius: 2mm; box-shadow: none; }
+      .room::before { display: none; }
+      .columns-scroller { overflow: visible; padding: 0 0 1.5mm; }
+      .columns { width: 100%; min-width: 0; grid-template-columns: repeat(var(--print-columns), minmax(0, 1fr)); grid-auto-flow: row; grid-auto-columns: auto; gap: 2mm; justify-content: stretch; }
+      .seat-column { min-width: 0; gap: 1.2mm; break-inside: avoid; }
+      .seat, .seat:hover { min-height: 18mm; padding: .6mm 1.2mm; border: .35mm solid #b9c1bb; border-bottom: .9mm solid #aeb6ae; border-radius: 1.5mm; box-shadow: none; transform: none; }
+      .seat-top { display: none; }
+      .seat-position { font-size: 5pt; }
+      .student-name { display: none; }
+      .student-name-print {
+        min-height: 11mm;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        color: #143d38;
+        font-size: 14pt;
+        font-weight: 800;
+        line-height: 1.1;
+        overflow-wrap: anywhere;
+        text-align: center;
+        white-space: pre-wrap;
+      }
+      .class-no-wrap { gap: 1mm; font-size: 8pt; }
+      .class-no { width: 14mm; height: 5.8mm; font-size: 14pt; }
+      input, textarea { -webkit-text-fill-color: currentColor; opacity: 1; }
+      .blackboard { width: 58%; min-height: 9mm; margin-top: 1.5mm; color: #fff; background: #245148 !important; border-width: 1.2mm; border-bottom-width: 1.5mm; box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .blackboard strong { font-size: 7pt; }
+      .blackboard span { color: #dce6e1; font-size: 5pt; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header no-print">
+    <div class="brand-mark" aria-hidden="true">▦</div>
+    <div class="brand-copy">
+      <p class="eyebrow">Classroom planner</p>
+      <h1>DeskPlan</h1>
+    </div>
+    <div class="header-actions">
+      <span id="saveState" class="save-state saved">Saved locally</span>
+      <button id="resetBtn" class="button" type="button" title="Reset the planner">↻ <span class="optional">Reset</span></button>
+      <button id="saveBtn" class="button button-save is-saved" type="button">✓ Save</button>
+      <button id="printBtn" class="button button-primary" type="button">⇩ Export PDF</button>
+    </div>
+  </header>
+
+  <section class="control-bar no-print" aria-label="Plan settings">
+    <label class="field">
+      <span>Class</span>
+      <input id="className" class="class-input" type="text" value="Class 5B" placeholder="e.g. Class 5B" maxlength="60" aria-label="Class name">
+    </label>
+
+    <div class="stepper-group">
+      <span>Columns</span>
+      <div class="stepper">
+        <button id="columnsMinus" type="button" aria-label="Remove a column">−</button>
+        <strong id="columnsValue">5</strong>
+        <button id="columnsPlus" type="button" aria-label="Add a column">+</button>
+      </div>
+    </div>
+
+    <div class="stepper-group">
+      <span>Seats per column</span>
+      <div class="stepper">
+        <button id="seatsMinus" type="button" aria-label="Remove a seat from each column">−</button>
+        <strong id="seatsValue">4</strong>
+        <button id="seatsPlus" type="button" aria-label="Add a seat to each column">+</button>
+      </div>
+    </div>
+
+    <div class="summary">
+      <span class="summary-dot" aria-hidden="true"></span>
+      <span><strong id="filledCount">0</strong> of <span id="totalCount">20</span> seats filled</span>
+    </div>
+  </section>
+
+  <main class="workspace">
+    <div class="print-title">
+      <p>Seating plan</p>
+      <h2 id="printClassName">Class 5B</h2>
+    </div>
+
+    <section class="room">
+      <div class="perspective-note no-print">
+        <span class="dot" aria-hidden="true"></span>
+        Teacher's view
+        <span class="divider" aria-hidden="true"></span>
+        Columns run left to right; seats run top to bottom
+        <span class="divider" aria-hidden="true"></span>
+        Drag a grip to swap students
+      </div>
+
+      <div class="columns-scroller">
+        <div id="columns" class="columns" aria-label="Student seating columns"></div>
+      </div>
+
+      <div class="blackboard" role="img" aria-label="Blackboard at the front of the classroom">
+        <div><strong>BLACKBOARD</strong><span>Front of classroom</span></div>
+      </div>
+    </section>
+
+    <p class="tip no-print">Tip: click one grip, then another, to swap seats without dragging. Click Save when you want this browser to remember the plan.</p>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'deskplan-standalone-v2';
+      const defaults = {
+        className: 'Class 5B',
+        columnCount: 5,
+        seatsPerColumn: 4,
+        students: [
+          ['Aarav', '01'], ['Mei', '02'], ['Sofia', '03'], ['Leo', '04'],
+          ['Zara', '05'], ['Noah', '06'], ['Hana', '07'], ['Ethan', '08'],
+          ['Amelia', '09'], ['Kai', '10'], ['Maya', '11'], ['Lucas', '12']
+        ]
+      };
+
+      const els = {
+        className: document.getElementById('className'),
+        printClassName: document.getElementById('printClassName'),
+        columns: document.getElementById('columns'),
+        columnsValue: document.getElementById('columnsValue'),
+        seatsValue: document.getElementById('seatsValue'),
+        columnsMinus: document.getElementById('columnsMinus'),
+        columnsPlus: document.getElementById('columnsPlus'),
+        seatsMinus: document.getElementById('seatsMinus'),
+        seatsPlus: document.getElementById('seatsPlus'),
+        filledCount: document.getElementById('filledCount'),
+        totalCount: document.getElementById('totalCount'),
+        saveBtn: document.getElementById('saveBtn'),
+        saveState: document.getElementById('saveState'),
+        resetBtn: document.getElementById('resetBtn'),
+        printBtn: document.getElementById('printBtn'),
+        toast: document.getElementById('toast')
+      };
+
+      let state = createDefaultState();
+      let isDirty = false;
+      let selectedIndex = null;
+      let draggingIndex = null;
+      let pointerStart = null;
+      let isPointerDragging = false;
+      let toastTimer = null;
+
+      function createDefaultState() {
+        const total = defaults.columnCount * defaults.seatsPerColumn;
+        return {
+          className: defaults.className,
+          columnCount: defaults.columnCount,
+          seatsPerColumn: defaults.seatsPerColumn,
+          students: Array.from({ length: total }, (_, index) => ({
+            id: 'student-' + index,
+            name: defaults.students[index]?.[0] || '',
+            classNo: defaults.students[index]?.[1] || ''
+          }))
+        };
+      }
+
+      function makeBlankStudent(index) {
+        return { id: 'student-' + index + '-' + Date.now(), name: '', classNo: '' };
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function loadSavedPlan() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return false;
+          const saved = JSON.parse(raw);
+          if (
+            typeof saved.className !== 'string' ||
+            !Array.isArray(saved.students) ||
+            !Number.isInteger(saved.columnCount) ||
+            !Number.isInteger(saved.seatsPerColumn)
+          ) return false;
+
+          saved.columnCount = clamp(saved.columnCount, 1, 10);
+          saved.seatsPerColumn = clamp(saved.seatsPerColumn, 1, 8);
+          const total = saved.columnCount * saved.seatsPerColumn;
+          saved.students = Array.from({ length: total }, (_, index) => {
+            const student = saved.students[index];
+            return student && typeof student === 'object'
+              ? {
+                  id: String(student.id || ('student-' + index)),
+                  name: String(student.name || ''),
+                  classNo: String(student.classNo || '')
+                }
+              : makeBlankStudent(index);
+          });
+          state = saved;
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function markDirty() {
+        if (isDirty) return;
+        isDirty = true;
+        els.saveState.textContent = 'Unsaved changes';
+        els.saveState.className = 'save-state unsaved';
+        els.saveBtn.classList.remove('is-saved');
+        els.saveBtn.innerHTML = '● Save';
+      }
+
+      function markSaved() {
+        isDirty = false;
+        els.saveState.textContent = 'Saved locally';
+        els.saveState.className = 'save-state saved';
+        els.saveBtn.classList.add('is-saved');
+        els.saveBtn.innerHTML = '✓ Save';
+      }
+
+      function showToast(message) {
+        clearTimeout(toastTimer);
+        els.toast.textContent = message;
+        els.toast.classList.add('show');
+        toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2200);
+      }
+
+      function savePlan() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          markSaved();
+          showToast('Seating plan saved on this device');
+        } catch (error) {
+          showToast('This browser could not save the plan');
+        }
+      }
+
+      function updateSummary() {
+        const filled = state.students.filter(student => student.name.trim()).length;
+        els.filledCount.textContent = String(filled);
+        els.totalCount.textContent = String(state.students.length);
+        els.columnsValue.textContent = String(state.columnCount);
+        els.seatsValue.textContent = String(state.seatsPerColumn);
+        els.columnsMinus.disabled = state.columnCount <= 1;
+        els.columnsPlus.disabled = state.columnCount >= 10;
+        els.seatsMinus.disabled = state.seatsPerColumn <= 1;
+        els.seatsPlus.disabled = state.seatsPerColumn >= 8;
+        els.printClassName.textContent = state.className.trim() || 'Untitled class';
+      }
+
+      function updateDimensions(nextColumns, nextSeats) {
+        const columnCount = clamp(nextColumns, 1, 10);
+        const seatsPerColumn = clamp(nextSeats, 1, 8);
+        const total = columnCount * seatsPerColumn;
+        state.columnCount = columnCount;
+        state.seatsPerColumn = seatsPerColumn;
+        state.students = Array.from(
+          { length: total },
+          (_, index) => state.students[index] || makeBlankStudent(index)
+        );
+        selectedIndex = null;
+        markDirty();
+        render();
+      }
+
+      function swapStudents(from, to) {
+        if (from === to || from == null || to == null) return;
+        const temp = state.students[from];
+        state.students[from] = state.students[to];
+        state.students[to] = temp;
+        selectedIndex = null;
+        markDirty();
+        render();
+      }
+
+      function handleSelect(index) {
+        if (selectedIndex == null) {
+          selectedIndex = index;
+          render();
+          showToast('Seat selected — choose another grip to swap');
+          return;
+        }
+        if (selectedIndex === index) {
+          selectedIndex = null;
+          render();
+          return;
+        }
+        swapStudents(selectedIndex, index);
+      }
+
+      function studentField(student, index, type) {
+        const input = document.createElement(type === 'name' ? 'textarea' : 'input');
+        input.value = type === 'name' ? student.name : student.classNo;
+        input.placeholder = type === 'name' ? 'Student name' : '—';
+        input.maxLength = type === 'name' ? 30 : 8;
+        input.className = type === 'name' ? 'student-name' : 'class-no';
+        if (type === 'name') input.rows = 2;
+        input.setAttribute('aria-label', (type === 'name' ? 'Student name' : 'Class number') + ' for seat ' + (index + 1));
+        input.addEventListener('input', event => {
+          state.students[index][type === 'name' ? 'name' : 'classNo'] = event.target.value;
+          markDirty();
+          updateSummary();
+        });
+        return input;
+      }
+
+      function createSeat(student, columnIndex, seatIndex) {
+        const index = columnIndex * state.seatsPerColumn + seatIndex;
+        const article = document.createElement('article');
+        article.className = 'seat';
+        article.dataset.seatIndex = String(index);
+        if (selectedIndex === index) article.classList.add('selected');
+        if (draggingIndex === index) article.classList.add('dragging');
+
+        const top = document.createElement('div');
+        top.className = 'seat-top';
+
+        const handle = document.createElement('button');
+        handle.type = 'button';
+        handle.className = 'drag-handle no-print';
+        handle.textContent = '⠿';
+        handle.title = 'Hold and drag to swap · Click to select';
+        handle.setAttribute('aria-label', 'Move ' + (student.name || ('seat ' + (index + 1))));
+
+        handle.addEventListener('pointerdown', event => {
+          pointerStart = { x: event.clientX, y: event.clientY, index };
+          isPointerDragging = false;
+          handle.setPointerCapture(event.pointerId);
+        });
+
+        handle.addEventListener('pointermove', event => {
+          if (!pointerStart) return;
+          const distance = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y);
+          if (distance <= 7) return;
+          isPointerDragging = true;
+          draggingIndex = pointerStart.index;
+          document.querySelectorAll('.seat').forEach(seat => seat.classList.remove('drop-target'));
+          const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-seat-index]');
+          if (target) target.classList.add('drop-target');
+          article.classList.add('dragging');
+        });
+
+        handle.addEventListener('pointerup', event => {
+          if (!pointerStart) return;
+          const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-seat-index]');
+          const targetIndex = target ? Number(target.dataset.seatIndex) : null;
+          const origin = pointerStart.index;
+          pointerStart = null;
+          draggingIndex = null;
+          document.querySelectorAll('.seat').forEach(seat => seat.classList.remove('drop-target', 'dragging'));
+          if (isPointerDragging && targetIndex != null) swapStudents(origin, targetIndex);
+          else if (!isPointerDragging) handleSelect(origin);
+          isPointerDragging = false;
+        });
+
+        handle.addEventListener('pointercancel', () => {
+          pointerStart = null;
+          isPointerDragging = false;
+          draggingIndex = null;
+          render();
+        });
+
+        top.append(handle);
+
+        const nameInput = studentField(student, index, 'name');
+        const namePrint = document.createElement('div');
+        namePrint.className = 'student-name-print';
+        namePrint.textContent = student.name;
+        namePrint.setAttribute('aria-hidden', 'true');
+        nameInput.addEventListener('input', () => {
+          namePrint.textContent = nameInput.value;
+        });
+        const classNoWrap = document.createElement('label');
+        classNoWrap.className = 'class-no-wrap';
+        const classNoLabel = document.createElement('span');
+        classNoLabel.textContent = 'Class no.';
+        classNoWrap.append(classNoLabel, studentField(student, index, 'classNo'));
+        article.append(top, nameInput, namePrint, classNoWrap);
+        return article;
+      }
+
+      function render() {
+        els.columns.replaceChildren();
+        els.className.value = state.className;
+        els.columns.style.setProperty('--print-columns', String(state.columnCount));
+
+        for (let columnIndex = 0; columnIndex < state.columnCount; columnIndex += 1) {
+          const column = document.createElement('section');
+          column.className = 'seat-column';
+
+          for (let seatIndex = 0; seatIndex < state.seatsPerColumn; seatIndex += 1) {
+            const index = columnIndex * state.seatsPerColumn + seatIndex;
+            column.append(createSeat(state.students[index], columnIndex, seatIndex));
+          }
+          els.columns.append(column);
+        }
+        updateSummary();
+      }
+
+      els.className.addEventListener('input', event => {
+        state.className = event.target.value;
+        markDirty();
+        updateSummary();
+      });
+
+      els.columnsMinus.addEventListener('click', () => updateDimensions(state.columnCount - 1, state.seatsPerColumn));
+      els.columnsPlus.addEventListener('click', () => updateDimensions(state.columnCount + 1, state.seatsPerColumn));
+      els.seatsMinus.addEventListener('click', () => updateDimensions(state.columnCount, state.seatsPerColumn - 1));
+      els.seatsPlus.addEventListener('click', () => updateDimensions(state.columnCount, state.seatsPerColumn + 1));
+      els.saveBtn.addEventListener('click', savePlan);
+      els.printBtn.addEventListener('click', () => window.print());
+
+      els.resetBtn.addEventListener('click', () => {
+        if (!window.confirm('Reset to the sample classroom? Your saved plan will remain until you click Save.')) return;
+        state = createDefaultState();
+        selectedIndex = null;
+        markDirty();
+        render();
+      });
+
+      window.addEventListener('beforeunload', event => {
+        if (!isDirty) return;
+        event.preventDefault();
+        event.returnValue = '';
+      });
+
+      const restored = loadSavedPlan();
+      render();
+      markSaved();
+      if (restored) setTimeout(() => showToast('Latest saved plan restored'), 250);
+    })();
+  </script>
+</body>
+</html>
