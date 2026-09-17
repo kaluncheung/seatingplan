@@ -87,6 +87,8 @@
       margin-left: auto;
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
       gap: 8px;
     }
 
@@ -530,7 +532,10 @@
       <span id="saveState" class="save-state saved">Saved locally</span>
       <button id="resetBtn" class="button" type="button" title="Reset the planner">↻ <span class="optional">Reset</span></button>
       <button id="saveBtn" class="button button-save is-saved" type="button">✓ Save</button>
+      <button id="importBtn" class="button" type="button" title="Import a DeskPlan file" aria-label="Import seating plan">↥ <span class="optional">Import plan</span></button>
+      <button id="exportBtn" class="button" type="button" title="Export a portable DeskPlan file" aria-label="Export seating plan">↧ <span class="optional">Export plan</span></button>
       <button id="printBtn" class="button button-primary" type="button">⇩ Export PDF</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
     </div>
   </header>
 
@@ -624,6 +629,9 @@
         totalCount: document.getElementById('totalCount'),
         saveBtn: document.getElementById('saveBtn'),
         saveState: document.getElementById('saveState'),
+        importBtn: document.getElementById('importBtn'),
+        exportBtn: document.getElementById('exportBtn'),
+        importFile: document.getElementById('importFile'),
         resetBtn: document.getElementById('resetBtn'),
         printBtn: document.getElementById('printBtn'),
         toast: document.getElementById('toast')
@@ -659,32 +667,42 @@
         return Math.min(max, Math.max(min, value));
       }
 
+      function normalizePlan(candidate) {
+        if (
+          !candidate ||
+          typeof candidate.className !== 'string' ||
+          !Array.isArray(candidate.students) ||
+          !Number.isInteger(candidate.columnCount) ||
+          !Number.isInteger(candidate.seatsPerColumn)
+        ) {
+          throw new Error('Invalid DeskPlan file');
+        }
+
+        const columnCount = clamp(candidate.columnCount, 1, 10);
+        const seatsPerColumn = clamp(candidate.seatsPerColumn, 1, 8);
+        const total = columnCount * seatsPerColumn;
+        return {
+          className: candidate.className.slice(0, 60),
+          columnCount,
+          seatsPerColumn,
+          students: Array.from({ length: total }, (_, index) => {
+            const student = candidate.students[index];
+            return student && typeof student === 'object'
+              ? {
+                  id: String(student.id || ('student-' + index)),
+                  name: String(student.name || '').slice(0, 30),
+                  classNo: String(student.classNo || '').slice(0, 8)
+                }
+              : makeBlankStudent(index);
+          })
+        };
+      }
+
       function loadSavedPlan() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
           if (!raw) return false;
-          const saved = JSON.parse(raw);
-          if (
-            typeof saved.className !== 'string' ||
-            !Array.isArray(saved.students) ||
-            !Number.isInteger(saved.columnCount) ||
-            !Number.isInteger(saved.seatsPerColumn)
-          ) return false;
-
-          saved.columnCount = clamp(saved.columnCount, 1, 10);
-          saved.seatsPerColumn = clamp(saved.seatsPerColumn, 1, 8);
-          const total = saved.columnCount * saved.seatsPerColumn;
-          saved.students = Array.from({ length: total }, (_, index) => {
-            const student = saved.students[index];
-            return student && typeof student === 'object'
-              ? {
-                  id: String(student.id || ('student-' + index)),
-                  name: String(student.name || ''),
-                  classNo: String(student.classNo || '')
-                }
-              : makeBlankStudent(index);
-          });
-          state = saved;
+          state = normalizePlan(JSON.parse(raw));
           return true;
         } catch (error) {
           return false;
@@ -723,6 +741,55 @@
         } catch (error) {
           showToast('This browser could not save the plan');
         }
+      }
+
+      function exportPlan() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          markSaved();
+        } catch (error) {
+          // The portable export still works if browser storage is unavailable.
+        }
+
+        const payload = {
+          format: 'DeskPlan seating plan',
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          plan: state
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const safeClassName = (state.className.trim() || 'classroom')
+          .replace(/[^a-z0-9]+/gi, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 50) || 'classroom';
+        link.href = url;
+        link.download = safeClassName + '-seating-plan.json';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        showToast('Portable seating plan exported');
+      }
+
+      function importPlan(file) {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+          try {
+            const parsed = JSON.parse(String(reader.result));
+            state = normalizePlan(parsed && parsed.plan ? parsed.plan : parsed);
+            selectedIndex = null;
+            render();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            markSaved();
+            showToast('Seating plan imported and saved');
+          } catch (error) {
+            showToast('This is not a valid DeskPlan file');
+          }
+        });
+        reader.addEventListener('error', () => showToast('The selected file could not be read'));
+        reader.readAsText(file);
       }
 
       function updateSummary() {
@@ -898,6 +965,13 @@
       els.seatsMinus.addEventListener('click', () => updateDimensions(state.columnCount, state.seatsPerColumn - 1));
       els.seatsPlus.addEventListener('click', () => updateDimensions(state.columnCount, state.seatsPerColumn + 1));
       els.saveBtn.addEventListener('click', savePlan);
+      els.exportBtn.addEventListener('click', exportPlan);
+      els.importBtn.addEventListener('click', () => els.importFile.click());
+      els.importFile.addEventListener('change', () => {
+        const file = els.importFile.files && els.importFile.files[0];
+        if (file) importPlan(file);
+        els.importFile.value = '';
+      });
       els.printBtn.addEventListener('click', () => window.print());
 
       els.resetBtn.addEventListener('click', () => {
